@@ -1,25 +1,22 @@
-import java.math.BigInteger
-
 fun main() {
-    var startingFishList: List<Int> = getData(6).first().split(",").map{ it.toInt()}
-    var fishMap = startingFishList.groupBy { it }.map { it.key to BigInteger.valueOf(it.value.size.toLong())}.toMap()
+    var startingFishList: List<Int> = getData(6).first().split(",").map { it.toInt() }
+    var fishMap = startingFishList.groupBy { it }.map { it.key to it.value.size.toLong() }.toMap()
 
     repeat(256) {
-        val newFishMap = mutableMapOf<Int,BigInteger>()
+        val newFishMap = mutableMapOf<Int, Long>()
 
-        fishMap.forEach  { t, u ->
+        // TODO: Surely a better way to do this
+        fishMap.forEach { t, u ->
             lifecycle(t).forEach {
-                newFishMap.put(it, u.plus(newFishMap.getOrDefault(it,BigInteger.ZERO)))
+                newFishMap.put(it, u + newFishMap.getOrDefault(it, 0))
             }
         }
         fishMap = newFishMap
     }
-    val fishcount = fishMap.values.fold(BigInteger.ZERO, BigInteger::plus)
-    println("[$fishcount] : $fishMap")
-
+    println("[${fishMap.values.sum()}] : $fishMap")
 }
 
 fun lifecycle(i: Int) = when {
-        (i == 0) -> listOf(6,8)
-        else -> listOf(i - 1)
-    }
+    (i == 0) -> listOf(6, 8)
+    else -> listOf(i - 1)
+}
