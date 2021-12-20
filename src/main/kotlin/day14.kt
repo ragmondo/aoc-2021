@@ -1,6 +1,5 @@
 import org.junit.jupiter.api.Assertions.assertEquals
 
-
 fun main() {
     mainpt1()
     mainpt2()
@@ -16,27 +15,22 @@ class Day14 {
         }
     }
     companion object {
-        var cacheMap = mutableMapOf<Pair<String, Int>, Map<Char, Long>>()
+        var cache = mutableMapOf<Pair<String, Int>, Map<Char, Long>>()
         var hits = 0L
         var misses = 0L
-
     }
 }
 
 fun mainpt1() {
-
     var (polymer, chains) = Day14.DataReader().read(true)
-
     repeat(10) {
         val pairs = polymer.dropLast(1).mapIndexed { it, c ->
             c.toString() + polymer[it + 1]
         }
         val inserts = pairs.map { it -> chains[it]!! }
-
         polymer = ((polymer.toList().zip(inserts) { a, b -> listOf(a, b) }).flatten() + polymer.last()).joinToString(
             separator = ""
         )
-//        println("${it+1} : [${polymer.length}] ") //  ${polymer}")
     }
     val groups = polymer.groupBy { it }.map{ it -> it.key to it.value.size}
     val sortedGroups = groups.sortedBy { it.second }
@@ -45,36 +39,21 @@ fun mainpt1() {
     println("$sortedGroups $f $l ${l.second - f.second}")
 }
 
-
-
 fun mainpt2() {
     var (polymer, chains) = Day14.DataReader().read()
     println(chains)
     println(polymer)
-
-//    val cache = mapOf()
-
-    val soln = recur(chains, polymer, 40)
-
+    val soln = synthesize(chains, polymer, 40)
     println(soln)
     val mx = soln.maxOf { it.value }
     val mn = soln.minOf { it.value }
     println(mx-mn)
-
 }
 
-class Memory()  {
-    companion object {
-        val m = Memory()
-        fun mem() = m
-    }
-}
-
-
-fun recur(chains: Map<String, Char>, s: String, levels: Int): Map<Char, Long> {
+// Recursive function to descend one level into an individual branch of the polymer
+// If the top level (ie source string is more than two chars) then split into two chars and recur
+fun synthesize(chains: Map<String, Char>, s: String, levels: Int): Map<Char, Long> {
     if (s.length > 2) {
-        // Divide into pairs and process those.
-
         val pairs = s.mapIndexed { index, c ->
             if(index < s.length - 1) {
                 "" + c + s[index + 1]
@@ -82,39 +61,45 @@ fun recur(chains: Map<String, Char>, s: String, levels: Int): Map<Char, Long> {
             else {null}
         }.filterNotNull()
 
+        // TODO: This bit better - it's very messy and I'm sure there are better functions to do the mapping I'm trying to do
         val mainresult = pairs.map { polypair ->
-            recur(chains, polypair, levels).map {
+            synthesize(chains, polypair, levels).map {
                 it.key to (it.value - (if (it.key == polypair[1]) 1 else 0))
             }.toMap()
         }
-
         var allkeys = mainresult.map { it.keys }.flatten().toSet().map{ it to 0L}.toMap().toMutableMap()
-
         mainresult.forEach { mr ->
             mr.forEach { it ->
                 allkeys.put(it.key, it.value + allkeys.getOrDefault(it.key, 0L))
             }
         }
-
         val lastChar = pairs.last()[1]
-
         allkeys.put(lastChar, 1 + allkeys.getOrDefault(lastChar, 0L))
-
         allkeys.forEach {
         return allkeys
         }
     }
 
-    assertEquals(s.length , 2, "S needs to be length 2 : $s")
+    assertEquals(s.length , 2, "S needs to be length 2 at this point: $s")
 
-    if(Pair(s, levels) in Day14.cacheMap) {
-        Day14.hits ++
-        return Day14.cacheMap.get(Pair(s, levels))!!
-    }
-    Day14.misses ++
+    val k = Pair(s, levels)
+
+    Day14.hits ++
+
+    // Can't use computeIfAbsent as we modify the cache
+    return Day14.cache.get(k) ?: {
+        val r = compute(chains, s, levels)
+        Day14.cache.put(k, r)
+        Day14.hits --
+        Day14.misses ++
+        r
+    }.invoke()
+}
+
+fun compute(chains: Map<String, Char>, s: String, levels: Int): Map<Char, Long> {
     if (levels == 0) {
         if ( s[0] == s[1]) {
-            return mapOf(s[0].toChar() to 2)
+            return mapOf(s[0].toChar() to 2L)
         }
         else {
             return s.toCharArray().map { it to 1L }.toMap()
@@ -122,8 +107,8 @@ fun recur(chains: Map<String, Char>, s: String, levels: Int): Map<Char, Long> {
     }
 
     val intermediate = chains.get(s) ?: throw RuntimeException("Looking for $s in polymer list and can't find")
-    val lhs = recur(chains, s[0] + intermediate.toString(), levels - 1)
-    val rhs = recur(chains, intermediate.toString() + s[1], levels - 1)
+    val lhs = synthesize(chains, s[0] + intermediate.toString(), levels - 1)
+    val rhs = synthesize(chains, intermediate.toString() + s[1], levels - 1)
     var ret = (lhs.keys + rhs.keys).toSet().map {
         it to lhs.getOrDefault(it,0) + rhs.getOrDefault(it, 0)
     }.toMap()
@@ -137,6 +122,5 @@ fun recur(chains: Map<String, Char>, s: String, levels: Int): Map<Char, Long> {
         }
     }.toMap()
 
-    Day14.cacheMap.put(Pair(s, levels), modified)
     return modified
 }
